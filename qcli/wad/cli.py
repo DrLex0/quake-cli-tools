@@ -54,6 +54,20 @@ def main():
     )
 
     parser.add_argument(
+        '-r',
+        dest='raw_color_mode',
+        action='store_true',
+        help='for images that use indexed color, assume they have the Quake color palette and skip RGB conversion; avoids color shifts'
+    )
+
+    parser.add_argument(
+        '-s',
+        dest='smooth_mip',
+        action='store_true',
+        help='smooth mipmap scaling, looks better in game engines that still rely on mipmaps in the BSP'
+    )
+
+    parser.add_argument(
         '-q',
         dest='quiet',
         action='store_true',
@@ -108,8 +122,9 @@ def main():
                 wad_file.write(file)
 
             elif args.type == 'QPIC':
-                img = Image.open(file).convert(mode='RGB')
-                img = img.quantize(palette=palette_image)
+                img = Image.open(file)
+                if img.mode != 'P' or not args.raw_color_mode:
+                    img = img.convert(mode='RGB').quantize(palette=palette_image)
                 pixels = img.tobytes()
                 name = os.path.basename(file).split('.')[0]
 
@@ -135,8 +150,10 @@ def main():
 
             else:
                 try:
-                    img = Image.open(file).convert(mode='RGB')
-                    img = img.quantize(palette=palette_image)
+                    img = Image.open(file)
+                    img_rgb = img.convert(mode='RGB')
+                    if img.mode != 'P' or not args.raw_color_mode:
+                        img = img_rgb.quantize(palette=palette_image)
 
                     name = os.path.basename(file).split('.')[0]
 
@@ -149,8 +166,20 @@ def main():
 
                     # Build mip maps
                     for i in range(4):
-                        resized_image = img.resize((img.width // pow(2, i), img.height // pow(2, i)))
-                        data = resized_image.tobytes()
+                        if i > 0:
+                            if args.smooth_mip:
+                                # resizing RGB image will benefit from smoothing and filtering
+                                resized_image = img_rgb.resize(
+                                    (img.width // pow(2, i), img.height // pow(2, i))
+                                ).quantize(palette=palette_image)
+                            else:
+                                # resizing quantized img will use nearest-neighbor
+                                resized_image = img.resize(
+                                    (img.width // pow(2, i), img.height // pow(2, i))
+                                )
+                            data = resized_image.tobytes()
+                        else:
+                            data = img.tobytes()
                         mip.pixels += struct.unpack(f'<{len(data)}B', data)
                         if i < 3:
                             mip.offsets += [mip.offsets[-1] + len(data)]
