@@ -19,6 +19,15 @@ import qcli
 from qcli.common import Parser, ResolvePathAction, read_from_stdin
 
 
+def has_fullbright(img):
+    """Given img in P mode with Quake palette, return whether it contains
+    at least 1 fullbright pixel or not"""
+    for y in range(0, img.height):
+        for x in range(0, img.width):
+            if img.getpixel((x, y)) > 223:
+                return True
+
+
 def main():
     """CLI entrypoint"""
 
@@ -65,6 +74,13 @@ def main():
         dest='smooth_mip',
         action='store_true',
         help='smooth mipmap scaling, looks better in game engines that still rely on mipmaps in the BSP'
+    )
+
+    parser.add_argument(
+        '-S',
+        dest='smart_mip',
+        action='store_true',
+        help='smart mipmap scaling, uses smooth scaling if texture has no fullbright pixels, nearest neighbor otherwise. Only reliable in combination with -r.'
     )
 
     parser.add_argument(
@@ -115,6 +131,11 @@ def main():
         palette_image = Image.frombytes('P', (16, 16), bytes(palette))
         palette_image.putpalette(palette)
 
+        # Same for palette without fullbright
+        palette_nofb = palette[:-96] + [0] * 96
+        palette_image_nofb = Image.frombytes('P', (16, 16), bytes(palette_nofb))
+        palette_image_nofb.putpalette(palette_nofb)
+
         # Process input files
         for file in args.list:
             if args.type == 'LUMP':
@@ -154,6 +175,7 @@ def main():
                     img_rgb = img.convert(mode='RGB')
                     if img.mode != 'P' or not args.raw_color_mode:
                         img = img_rgb.quantize(palette=palette_image)
+                    has_fb = has_fullbright(img)
 
                     name = os.path.basename(file).split('.')[0]
 
@@ -165,13 +187,17 @@ def main():
                     mip.pixels = []
 
                     # Build mip maps
+                    smooth_scaling = args.smooth_mip or (args.smart_mip and not has_fb)
                     for i in range(4):
                         if i > 0:
-                            if args.smooth_mip:
+                            if smooth_scaling:
+                                # If original had no FB pixels, ensure we won't
+                                # introduce any with the smooth scaling
+                                target_palette = palette_image if has_fb else palette_image_nofb
                                 # resizing RGB image will benefit from smoothing and filtering
                                 resized_image = img_rgb.resize(
                                     (img.width // pow(2, i), img.height // pow(2, i))
-                                ).quantize(palette=palette_image)
+                                ).quantize(palette=target_palette)
                             else:
                                 # resizing quantized img will use nearest-neighbor
                                 resized_image = img.resize(
