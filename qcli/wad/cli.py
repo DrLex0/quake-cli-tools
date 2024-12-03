@@ -55,7 +55,7 @@ def main():
     )
 
     parser.add_argument(
-        '-t',
+        '-t', '--type',
         dest='type',
         default='MIPTEX',
         choices=['LUMP', 'QPIC', 'MIPTEX'],
@@ -63,28 +63,28 @@ def main():
     )
 
     parser.add_argument(
-        '-r',
+        '-r', '--raw-indexed',
         dest='raw_color_mode',
         action='store_true',
         help='for images that use indexed color, assume they have the Quake color palette and skip RGB conversion; avoids color shifts'
     )
 
     parser.add_argument(
-        '-s',
+        '-s', '--smooth-mip',
         dest='smooth_mip',
         action='store_true',
         help='smooth mipmap scaling, looks better in game engines that still rely on mipmaps in the BSP'
     )
 
     parser.add_argument(
-        '-S',
+        '-S', '--smart-mip',
         dest='smart_mip',
         action='store_true',
         help='smart mipmap scaling, uses smooth scaling if texture has no fullbright pixels, nearest neighbor otherwise. Only reliable in combination with -r.'
     )
 
     parser.add_argument(
-        '-q',
+        '-q', '--quiet',
         dest='quiet',
         action='store_true',
         help='quiet mode'
